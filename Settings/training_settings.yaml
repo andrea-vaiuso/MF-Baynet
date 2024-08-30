@@ -1,0 +1,37 @@
+# Path where the trained model will be saved
+MODEL_PATH: "AIModels/20240830_dataset8aug/"
+# Path to the YAML file containing dataset settings
+DATASET_YAML_PATH: "Datasets/dataset_config_example.yaml"
+
+# Early stopping patience for low-fidelity model training
+PATIENCE_LF: 300
+# Maximum number of epochs for low-fidelity model training
+N_EPOCHS_LF: 5000
+# Batch size for low-fidelity model training
+BATCH_SIZE_LF: 32
+# Learning rate for low-fidelity model training
+LR_LF: 0.0016
+# Early stopping patience for mid-fidelity model training
+PATIENCE_MF: 5000
+# Maximum number of epochs for mid-fidelity model training
+N_EPOCHS_MF: 10000
+# Batch size for mid-fidelity model training
+BATCH_SIZE_MF: 32
+# Learning rate for mid-fidelity model training
+LR_MF: 0.01
+# Early stopping patience for transfer learning model training
+PATIENCE_TL: 500
+# Maximum number of epochs for transfer learning model training
+N_EPOCHS_TL: 8000
+# Batch size for transfer learning model training
+BATCH_SIZE_TL: 16
+# Learning rate for transfer learning model training
+LR_TL: 0.0081
+# Number of layers to unfreeze for fine-tuning during transfer learning
+N_LAYER_TO_UNFREEZE: 3
+
+# Flags to control whether to train each model component
+TRAIN_LF: true  # Train the low-fidelity model
+TRAIN_MF: true  # Train the mid-fidelity model
+TRAIN_TL: true  # Perform transfer learning
+TRAIN_CK: true  # Train the Co-Kriging model

@@ -1,0 +1,13 @@
+DATASET_LOCATION: "/dataset_file.csv"
+SEP: ";"
+
+DATASET_DESCRIPTION: "Starting dataset with no augmentation"
+
+INPUT_LABELS: ["aoa", "aos", "u_inf", "PP", "FR", "FL", "RR", "RL"]
+OUTPUT_LABELS: ["T_PP", "Q_PP", "T_FR", "Q_FR", "T_FL", "Q_FL", "T_RR", "Q_RR", "T_RL", "Q_RL"]
+FIDELITY_COLUMN_NAME: "Fidelity"
+FIDELITIES: ["LF","MF"]
+
+LF_TRAIN_SIZE: 0.70
+MF_TRAIN_SIZE: 0.70
+MF_VALID_SIZE: 0.15

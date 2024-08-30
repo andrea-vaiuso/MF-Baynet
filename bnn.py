@@ -1,5 +1,5 @@
 # AUTHOR: Andrea Vaiuso
-MODEL_VERSION = "4.14"
+MODEL_VERSION = "4.15"
 
 import torch
 import torch.nn as nn
@@ -22,8 +22,27 @@ from typing import List, Tuple
 Color = PrCol()
 
 class BNNDataset(Dataset):
-    
+    """
+    A custom PyTorch Dataset for Bayesian Neural Networks (BNN).
+
+    Attributes:
+        data (pd.DataFrame): The dataset.
+        input_labels (list): List of column names for input features.
+        output_labels (list): List of column names for output features.
+        device (str): The device to use for tensors (default: "cpu").
+        dtype (torch.dtype): The data type for tensors (default: torch.float32).
+    """
     def __init__(self, data: pd.DataFrame, input_labels: list, output_labels: list, device = "cpu", dtype = torch.float32):
+        """
+        Initializes the BNNDataset with data and labels.
+
+        Args:
+            data (pd.DataFrame): The dataset.
+            input_labels (list): List of column names for input features.
+            output_labels (list): List of column names for output features.
+            device (str): The device to use for tensors (default: "cpu").
+            dtype (torch.dtype): The data type for tensors (default: torch.float32).
+        """
         self.x = data[input_labels]
         self.y = data[output_labels]
         self.data = data
@@ -31,8 +50,19 @@ class BNNDataset(Dataset):
         self.output_labels = output_labels
         self.device = device
         self.dtype = dtype
+        self.tot_time = 0
+        self.best_epoch = 0
 
     def __add__(self, other):
+        """
+        Combines two BNNDataset instances.
+
+        Args:
+            other (BNNDataset): Another instance of BNNDataset.
+
+        Returns:
+            BNNDataset: A new BNNDataset instance combining both datasets.
+        """
         if not isinstance(other, BNNDataset):
             raise TypeError("Both operands must be of type BNNDataset")
         combined_data = pd.concat([self.data, other.data], ignore_index=True)
@@ -43,66 +73,129 @@ class BNNDataset(Dataset):
                           self.dtype)
 
     def __str__(self):
+        """
+        Returns the string representation of the dataset.
+
+        Returns:
+            str: String representation of the dataset.
+        """
         return self.data.__str__()
     
     def __sizeof__(self) -> int:
+        """
+        Returns the size of the dataset in bytes.
+
+        Returns:
+            int: Size of the dataset in bytes.
+        """
         return self.data.__sizeof__()
 
     def __len__(self):
+        """
+        Returns the number of samples in the dataset.
+
+        Returns:
+            int: Number of samples in the dataset.
+        """
         return len(self.x)
 
     def __getitem__(self, idx):
+        """
+        Retrieves a single sample from the dataset.
+
+        Args:
+            idx (int): The index of the sample to retrieve.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the input and output tensors.
+        """
         return torch.tensor(self.x.iloc[idx].values, device=self.device, dtype=self.dtype), torch.tensor(self.y.iloc[idx].values, device=self.device, dtype=self.dtype)
     
     def train_val_test_split(self, train_size: float = 0.7, val_size: float = 0.15, seed: int = 42):
-        # Calcola le lunghezze per train, validation e test
+        """
+        Splits the dataset into training, validation, and test sets.
+
+        Args:
+            train_size (float): Proportion of the dataset to include in the training set.
+            val_size (float): Proportion of the dataset to include in the validation set.
+            seed (int): Random seed for shuffling the dataset.
+
+        Returns:
+            Tuple[BNNDataset, BNNDataset, BNNDataset]: The training, validation, and test datasets.
+        """
         total_size = len(self.data)
         train_len = int(train_size * total_size)
         val_len = int(val_size * total_size)
-
-        # Shuffle del dataset
         data = self.data.sample(frac=1, random_state=seed).reset_index(drop=True)
-
-        # Dividi il dataset in train, validation e test
         train_data, val_data, test_data = data[:train_len], data[train_len:train_len + val_len], data[train_len + val_len:]
-        print(train_data)
-        # Crea gli oggetti BNNDataset per train, validation e test
         train_dataset = BNNDataset(train_data, self.input_labels, self.output_labels)
         val_dataset = BNNDataset(val_data, self.input_labels, self.output_labels)
         test_dataset = BNNDataset(test_data, self.input_labels, self.output_labels)
-
         return train_dataset, val_dataset, test_dataset
     
     def train_val_split(self, train_size: float = 0.7, seed: int = 42):
-        # Calcola le lunghezze per train, validation e test
+        """
+        Splits the dataset into training and validation sets.
+
+        Args:
+            train_size (float): Proportion of the dataset to include in the training set.
+            seed (int): Random seed for shuffling the dataset.
+
+        Returns:
+            Tuple[BNNDataset, BNNDataset]: The training and validation datasets.
+        """
         total_size = len(self.data)
         train_len = int(train_size * total_size)
-
-        # Shuffle del dataset
         data = self.data.sample(frac=1, random_state=seed).reset_index(drop=True)
-
-        # Dividi il dataset in train, validation e test
         train_data, val_data = data[:train_len], data[train_len:]
-
-        # Crea gli oggetti BNNDataset per train, validation e test
         train_dataset = BNNDataset(train_data, self.input_labels, self.output_labels)
         val_dataset = BNNDataset(val_data, self.input_labels, self.output_labels)
 
         return train_dataset, val_dataset
 
 class BNN(nn.Module):
+    """
+    A Bayesian Neural Network (BNN) implementation using PyTorch and torchbnn.
+
+    Attributes:
+        in_layer (bnn.BayesLinear): Input layer of the BNN.
+        hidden_layers (nn.ModuleList): List of hidden layers in the BNN.
+        out_layer (nn.Module): Output layer of the BNN.
+        activation (nn.Module): Activation function used in the BNN.
+        dropout_flag (bool): Indicates if dropout is used.
+        dropout_norm (nn.Dropout): Dropout layer for input.
+        hidden_dropout (nn.ModuleList): Dropout layers for hidden layers.
+        device (str): Device to run the model on.
+        model_name (str): Name of the model.
+        version (str): Model version.
+    """
     def __init__(self, 
-                 in_dim, 
-                 out_dim, 
-                 mu=0, 
-                 std=0.5, 
-                 units=[100], 
-                 denseOut = False,
-                 dropout = False,
-                 device = "cpu",
-                 activation = nn.LeakyReLU(),
-                 model_name = "BNN DEFAULT"
+                 in_dim:int, 
+                 out_dim:int, 
+                 mu:float=0, 
+                 std:float=0.5, 
+                 units:list=[100], 
+                 denseOut:bool = False,
+                 dropout:bool = False,
+                 device:str = "cpu",
+                 activation:nn.Module = nn.LeakyReLU(),
+                 model_name:str = "BNN DEFAULT"
                  ):
+        """
+        Initializes the Bayesian Neural Network (BNN).
+
+        Args:
+            in_dim (int): Number of input features.
+            out_dim (int): Number of output features.
+            mu (float): Mean for the prior distribution.
+            std (float): Standard deviation for the prior distribution.
+            units (list): List of units for hidden layers.
+            denseOut (bool): If True, use a deterministic output layer; otherwise, use a Bayesian output layer.
+            dropout (bool): If True, use dropout layers.
+            device (str): Device to run the model on (default: "cpu").
+            activation (nn.Module): Activation function to use (default: nn.LeakyReLU()).
+            model_name (str): Name of the model (default: "BNN DEFAULT").
+        """
         super().__init__()
         self.version = MODEL_VERSION
         self.model_name = model_name
@@ -127,6 +220,15 @@ class BNN(nn.Module):
             self.out_layer = bnn.BayesLinear(prior_mu=mu, prior_sigma=std, in_features=units[-1], out_features=out_dim).to(self.device)
 
     def forward(self, x):
+        """
+        Defines the forward pass of the network.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         x = self.activation(self.in_layer(x))
         if self.dropout_flag: x = self.dropout_norm(x)
         for i in range(len(self.hidden_layers)):
@@ -148,12 +250,33 @@ class BNN(nn.Module):
             restoreBestModel:bool = True, 
             verbose:bool = True, 
             show_loadbar:bool = True,
-            plotHistory:bool = True,
+            showPlotHistory:bool = True,
             lrdecay:tuple = None, #(step_size, gamma)
             lrdecay_limit:float = 0.00005,
             history_plot_saving_path: str = None,
             batchnorm:int = 0
             ):
+        """
+        Trains the Bayesian Neural Network (BNN).
+
+        Args:
+            train_data (BNNDataset): The training dataset.
+            valid_data (BNNDataset): The validation dataset.
+            n_epochs (int): Number of epochs to train (default: 1000).
+            patience (int): Number of epochs to wait for improvement before stopping (default: 20).
+            lr (float): Learning rate (default: 0.001).
+            batch_size (int): Batch size (default: 1).
+            earlyStopping (bool): If True, use early stopping (default: True).
+            shuffle (bool): If True, shuffle the data (default: True).
+            restoreBestModel (bool): If True, restore the best model at the end of training (default: True).
+            verbose (bool): If True, print training progress (default: True).
+            show_loadbar (bool): If True, show a progress bar during training (default: True).
+            showPlotHistory (bool): If True, display the loss history plot (default: True).
+            lrdecay (tuple): Tuple containing step size and decay factor for learning rate scheduler (default: None).
+            lrdecay_limit (float): The lower limit for learning rate decay (default: 0.00005).
+            history_plot_saving_path (str): Path to save the loss history plot (default: None).
+            batchnorm (int): Type of batch normalization to apply (default: 0).
+        """
         self.earlyStopping = earlyStopping
         train_data.device = self.device
         valid_data.device = self.device
@@ -256,26 +379,38 @@ class BNN(nn.Module):
                 loadBar.tock()
                 if patience_count >= patience:
                     if verbose: print(f"\n{Color.yellow}Early stopping at epoch {self.best_epoch}{Color.end}")
-                    if verbose: print(f"Total enlapsed time: {(time() - tot_t1):.2f} sec")
+                    self.tot_time = time() - tot_t1
+                    if verbose: self.tot_time = time() - tot_t1; print(f"Total enlapsed time: {(self.tot_time):.2f} sec")
                     break
 
-            if plotHistory: self._plotHistory(save_path=history_plot_saving_path)
+            self._plotHistory(save_path=history_plot_saving_path,showplot=showPlotHistory)
             if restoreBestModel:
                 if verbose: print(f"{Color.green}Saving best model at epoch {self.best_epoch}{Color.end}")
                 self = best_model
-            if verbose: print(f"Total enlapsed time: {(time() - tot_t1):.2f} sec")
+            if verbose: self.tot_time = time() - tot_t1; print(f"Total enlapsed time: {(self.tot_time):.2f} sec")
             return 
 
         except KeyboardInterrupt:
             if verbose: print(f"\n{Color.magenta}Interrupting training at epoch {self.best_epoch}...{Color.end}")
-            if plotHistory: self._plotHistory(save_path=history_plot_saving_path)
+            self._plotHistory(save_path=history_plot_saving_path,showplot=showPlotHistory)
             if restoreBestModel:
                 if verbose: print(f"{Color.green}Saving best model at epoch {self.best_epoch}{Color.end}")
                 self = best_model
-            if verbose: print(f"Total enlapsed time: {(time() - tot_t1):.2f} sec")
+            if verbose: self.tot_time = time() - tot_t1; print(f"Total enlapsed time: {(self.tot_time):.2f} sec")
             return
         
-    def k_fold_cross_validation(self, train_data, k=5, **train_args):
+    def k_fold_cross_validation(self, train_data:BNNDataset, k:int=5, **train_args):
+        """
+        Performs k-fold cross-validation on the BNN.
+
+        Args:
+            train_data (BNNDataset): The dataset to perform cross-validation on.
+            k (int): Number of folds (default: 5).
+            **train_args: Additional arguments for the train method.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Average training and validation losses across folds.
+        """
         kf = KFold(n_splits=k)
         fold_train_losses = []
         fold_valid_losses = []
@@ -300,6 +435,12 @@ class BNN(nn.Module):
         return avg_train_losses, avg_valid_losses
     
     def getAllParametersName(self):
+        """
+        Returns the names of all parameters in the model.
+
+        Returns:
+            list: List of parameter names.
+        """
         par_name = []
         for name, _ in self.named_parameters():
             name_splitted = name.split(".")
@@ -309,6 +450,12 @@ class BNN(nn.Module):
         return list(set(par_name))
     
     def getAllLayersName(self):
+        """
+        Returns the names of all layers in the model.
+
+        Returns:
+            list: List of layer names.
+        """
         par_name = []
         for name, _ in self.named_parameters():
             name_splitted = name.split(".")
@@ -318,9 +465,17 @@ class BNN(nn.Module):
         return list(dict.fromkeys(par_name))
 
     def setModelGradients(self, 
-                          requires_grad, 
-                          params = None,
-                          layers = None):
+                          requires_grad:bool, 
+                          params:list = None,
+                          layers:list = None):
+        """
+        Sets the requires_grad attribute for the specified parameters and layers.
+
+        Args:
+            requires_grad (bool): Whether the gradients should be computed.
+            params (list): List of parameter names to set requires_grad for (default: None).
+            layers (list): List of layer names to set requires_grad for (default: None).
+        """
         if params is None: params = self.getAllParametersName()
         if layers is None: layers = self.getAllLayersName()
         for name, param in self.named_parameters():
@@ -330,7 +485,14 @@ class BNN(nn.Module):
             if name_splitted[-1] in params and name_splitted[0] in layers:
                 param.requires_grad = requires_grad
     
-    def _plotHistory(self,save_path=None):
+    def _plotHistory(self,save_path:str=None,showplot:bool=True):
+        """
+        Plots the training and validation loss history.
+
+        Args:
+            save_path (str): Path to save the loss history plot (default: None).
+            showplot (bool): If True, display the plot (default: True).
+        """
         lim_max = max([max(self.train_loss_history), max(self.valid_loss_history)])
         lim_min = min([min(self.train_loss_history), min(self.valid_loss_history)])
         half = (lim_max - lim_min) / 2
@@ -357,20 +519,37 @@ class BNN(nn.Module):
         axs[1].set_ylim([min_y_val-span_y, min_y_val+span_y*2])
         plt.legend()
         plt.suptitle(f"{self.model_name}: Training loss") 
-        if save_path is not None: plt.savefig(f"{save_path}/history_{self.model_name}.pdf")
-        plt.show()
+        if save_path is not None: plt.savefig(f"{save_path}history_{self.model_name}.pdf")
+        if showplot: plt.show()
 
-    def predict(self, x, attempt=100, scaler:MMS=None, output_labels:str=None, returnDataFrame=False):
+    def predict(self, x, attempt: int = 100, scaler: MMS = None, output_labels: list = None, returnDataFrame: bool = False):
+        """
+        Generates predictions with uncertainty estimates using the Bayesian model.
+
+        Args:
+            x (array-like): Input data for prediction.
+            attempt (int): Number of stochastic forward passes for uncertainty estimation (default: 100).
+            scaler (MMS): Scaler object for reversing normalization (default: None).
+            output_labels (list): List of output labels (default: None).
+            returnDataFrame (bool): If True, returns results as pandas DataFrames (default: False).
+
+        Returns:
+            Tuple: Mean and standard deviation of predictions, optionally as DataFrames.
+        """
         means = []
         stds = []
 
         for data in x:
+            # Ensure the input data is on the same device as the model
             if not isinstance(data, torch.Tensor):
                 data = torch.tensor(data, dtype=torch.float32).to(self.device)
+            else:
+                data = data.to(self.device)
             
             predictions = np.zeros((attempt, len(output_labels)))
 
             for i in range(attempt):
+                # Make sure the prediction is also done on the same device
                 p = self(data).detach().cpu().numpy()
                 if scaler is not None and output_labels is not None:
                     p = scaler.reverseArray(p, columns=output_labels)
@@ -387,7 +566,18 @@ class BNN(nn.Module):
         else:
             return means, stds
     
-    def _removeZeros(self, gt, pred=None, offset=1.5):
+    def _removeZeros(self, gt: np.ndarray, pred:np.ndarray = None, offset:float = 1.5):
+        """
+        Adds a small offset to the ground truth and predictions to avoid zero values.
+
+        Args:
+            gt (np.ndarray): Ground truth array.
+            pred (np.ndarray): Predicted values array (default: None).
+            offset (float): Value to add to avoid zero values (default: 1.5).
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Adjusted ground truth and prediction arrays.
+        """
         if pred is None: pred = gt
         assert len(gt) == len(pred), "Array length mismatch"
         for i in range(len(gt)):
@@ -395,6 +585,16 @@ class BNN(nn.Module):
         return gt, pred
 
     def _smape(self, gt: np.ndarray, pred: np.ndarray):
+        """
+        Computes the Symmetric Mean Absolute Percentage Error (SMAPE) between the ground truth and predictions.
+
+        Args:
+            gt (np.ndarray): Ground truth array.
+            pred (np.ndarray): Predicted values array.
+
+        Returns:
+            list: SMAPE values as a percentage.
+        """
         abs_diff = np.abs(pred - gt)
         abs_sum = np.abs(pred) + np.abs(gt)
         gt_modified = gt.copy()
@@ -402,9 +602,32 @@ class BNN(nn.Module):
         return list((abs_diff / abs_sum) * 100)
     
     def _mae(self, gt: np.ndarray, pred: np.ndarray):
+        """
+        Computes the Mean Absolute Error (MAE) between the ground truth and predictions.
+
+        Args:
+            gt (np.ndarray): Ground truth array.
+            pred (np.ndarray): Predicted values array.
+
+        Returns:
+            np.ndarray: MAE values.
+        """
         return np.abs(gt - pred)
 
-    def testModel(self, test_set:BNNDataset, scaler:MMS, output_labels:list, attempt = 10, skip = []):
+    def testModel(self, test_set:BNNDataset, scaler:MMS, output_labels:list, attempt:int = 10, skip:list = []):
+        """
+        Tests the model on a test dataset and returns the prediction errors.
+
+        Args:
+            test_set (BNNDataset): The test dataset.
+            scaler (MMS): Scaler object to reverse normalization.
+            output_labels (list): List of output labels.
+            attempt (int): Number of stochastic forward passes for uncertainty estimation (default: 10).
+            skip (list): Indices to skip during testing (default: []).
+
+        Returns:
+            Tuple[list, list]: Prediction errors and standard deviations.
+        """
         errors = []
         cov = []
         for i, data in enumerate(test_set):
@@ -419,20 +642,50 @@ class BNN(nn.Module):
             cov.append(stds)
         return errors, cov
     
-    def save(self, path, subfolder = "AIModels/", save_model_resume = True):
+    def save(self, path:str, subfolder:str = "AIModels/", save_model_resume:bool = True):
+        """
+        Saves the model state to a file.
+
+        Args:
+            path (str): The file path to save the model.
+            subfolder (str): Subfolder to save the model in (default: "AIModels/").
+            save_model_resume (bool): If True, prints the model summary (default: True).
+        """
         try: os.makedirs(subfolder)
-        except FileExistsError as e: pass
+        except: pass
         torch.save(self.state_dict(), path)
         if save_model_resume:
             self.__str__()
         print(f"{Color.green}[{Color.end}{self.model_name}{Color.green}] >> Model Saved{Color.end}")
 
-    def load(self, path):
+    def load(self, path: str, device:str="cpu"):
+        """
+        Loads the model state from a file.
+
+        Args:
+            path (str): The file path to load the model from.
+            device (str): The device to load the model onto (default: "cpu").
+        """
         self.load_state_dict(torch.load(path))
-        print(f"{Color.green}[{Color.end}{self.model_name}{Color.green}] >> Model Loaded on {Color.blue}{self.device}{Color.end}")
+        print(f"{Color.green}[{Color.end}{self.model_name}{Color.green}] >> Model Loaded on {Color.blue}{device}{Color.end}")
 
 
 def test_multiple_models(models_to_test: List[BNN], test_set: BNNDataset, scaler: MMS, output_labels: list, attempt: int = 100, path: str = "test_results.csv", save_test_results: bool = True) -> pd.DataFrame:
+    """
+    Tests multiple BNN models on the same test set and logs their performance.
+
+    Args:
+        models_to_test (List[BNN]): List of models to test.
+        test_set (BNNDataset): The test dataset.
+        scaler (MMS): Scaler object to reverse normalization.
+        output_labels (list): List of output labels.
+        attempt (int): Number of stochastic forward passes for uncertainty estimation (default: 100).
+        path (str): File path to save the test results (default: "test_results.csv").
+        save_test_results (bool): If True, save the test results to a CSV file (default: True).
+
+    Returns:
+        pd.DataFrame: DataFrame containing the error metrics for each model.
+    """
     error_data = {"Model Name": []}
     for out_val in output_labels:
         error_data[out_val + " ERR%"] = []
