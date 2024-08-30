@@ -1,8 +1,16 @@
-# Multi-Fidelity Bayesian Neural Network (BNN) Library Documentation
+# Multi-Fidelity Bayesian Neural Network (MF-Baynet)
 
 ## Overview
 
 The Multi-Fidelity BNN library is designed to support the training, testing, and deployment of Bayesian Neural Networks (BNNs) with different fidelity levels. This library is particularly suited for scenarios where multiple levels of data fidelity are available, and the goal is to create models that can leverage this multi-fidelity data to make robust predictions with uncertainty estimates.
+
+### Academic Reference
+
+This library is based on our methodologies and approaches discussed in the paper:
+
+- **Vaiuso, Andrea et al.** "Multi-Fidelity Bayesian Neural Networks for Uncertainty Quantification in Transonic Aerodynamic Loads." arXiv preprint arXiv:2407.05684 (2024). [Link to Paper](https://arxiv.org/abs/2407.05684)
+
+Our paper provides the theoretical foundation for the multi-fidelity modeling techniques implemented in this library. It emphasizes the use of Bayesian Neural Networks (BNNs) with Transfer Learning (TL) to fuse data from different fidelities, a method that has been shown to outperform traditional approaches like Co-Kriging in both accuracy and uncertainty quantification. The approach is particularly valuable in aerospace engineering for tasks such as predicting transonic aerodynamic loads where different fidelity levels (e.g., low-fidelity panel methods, mid-fidelity RANS simulations, and high-fidelity CFD) are available.
 
 ## Project Structure
 
@@ -11,8 +19,6 @@ The project is organized as follows:
 ```
 AIModels/
 Datasets/
-Heatmaps/
-Jupiter/
 Settings/
   └── model_settings.yaml
   └── server_settings.yaml
@@ -113,29 +119,22 @@ python training.py
 ### Step 3: Test the Models
 After training, use the `test.py` script to evaluate the models on a test dataset. This script will:
 - Load the trained models and test dataset.
-- Evaluate the models and calculate performance metrics.
-- Save the test results for analysis.
+- Normalize the test data using the same scaler used during training.
+- Perform predictions using the trained models.
+- Save the prediction results and error metrics for further analysis.
 
 ```bash
 python test.py
 ```
 
 ### Step 4: Deploy the Model
-Once the models are trained and tested, you can deploy them using the `server.py` script. This will set up a server that listens for incoming requests, runs the model on the input data, and returns the predictions.
+Once the model is trained and validated, it can be deployed using the `server.py` script. This script sets up a server that can accept input data, run the model, and return predictions. The server can be configured using the settings in `server_settings.yaml`.
 
 ```bash
 python server.py
 ```
 
-### Step 5: Augment and Prepare Data
-If needed, you can use the `dataset_augmentation.ipynb` notebook to perform additional data augmentation before training. This is especially useful if your dataset is small or if you want to experiment with different data preprocessing techniques.
-
-## Conclusion
-
-The Multi-Fidelity BNN library is a powerful tool for training and deploying Bayesian Neural Networks in scenarios where multi-fidelity data is available. By carefully following the structure and steps outlined in this guide, you can efficiently develop robust models that not only make predictions but also provide uncertainty estimates, making them highly valuable in real-world applications where decision-making under uncertainty is critical.
-
-For further questions or support, please refer to the documentation within each module or contact the development team.
+### Step 5: Visualize Results
+After running predictions, use the plotting utilities in `training.py` or custom scripts to visualize the results, compare them with ground truth data, and analyze the uncertainty estimates provided by the BNN models.
 
 ---
-
-This document should serve as a comprehensive guide to help you navigate the project and effectively utilize the Multi-Fidelity BNN library.
