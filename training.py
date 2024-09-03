@@ -52,13 +52,12 @@ def setup_model_directory(MODEL_PATH):
     return path_exists
 
 # Function to load and normalize datasets
-def load_and_normalize_datasets(dataset_settings, FIDELITY_COLUMN_NAME, path_exists, MODEL_PATH):
+def load_and_normalize_datasets(dataset_settings, path_exists, model_path):
     """
     Loads the dataset and applies normalization using MinMaxScaler.
 
     Args:
         dataset_settings (dict): Settings related to the dataset.
-        FIDELITY_COLUMN_NAME (str): The column name in the dataset indicating fidelity level.
         path_exists (bool): Indicates whether the model path already exists.
         MODEL_PATH (str): The path where normalization data should be saved/loaded.
 
@@ -66,17 +65,21 @@ def load_and_normalize_datasets(dataset_settings, FIDELITY_COLUMN_NAME, path_exi
         tuple: A tuple containing a list of normalized datasets and the scaler used.
     """
     dataset = pd.read_csv(dataset_settings["DATASET_LOCATION"], sep=dataset_settings["SEP"])
+    in_out_col = dataset_settings["OUTPUT_LABELS"] + dataset_settings["INPUT_LABELS"]
+    all_dataset_columns = dataset.columns.tolist()
+    drop_col_list = [col for col in all_dataset_columns if col not in in_out_col]
     if not path_exists:
-        scaler = MMS(dataset.drop(columns=[FIDELITY_COLUMN_NAME], inplace=False), interval=(1, 2))
-        scaler.save(path=f"{MODEL_PATH}NormalizationData", filename=f"normdata.pkl")
+        
+        scaler = MMS(dataset.drop(columns=drop_col_list, inplace=False), interval=(1, 2))
+        scaler.save(path=f"{model_path}NormalizationData", filename=f"normdata.pkl")
     else:
         scaler = MMS()
-        scaler.load(f"{MODEL_PATH}NormalizationData/normdata.pkl")
+        scaler.load(f"{model_path}NormalizationData/normdata.pkl")
     
     normalized_datasets = []
     for fid in dataset_settings["FIDELITIES"]:
-        dataset_fidelity = dataset[dataset[FIDELITY_COLUMN_NAME] == fid]
-        dataset_fidelity_norm = scaler.scaleDataframe(dataset_fidelity.drop(columns=[FIDELITY_COLUMN_NAME], inplace=False))
+        dataset_fidelity = dataset[dataset[dataset_settings["FIDELITY_COLUMN_NAME"]] == fid]
+        dataset_fidelity_norm = scaler.scaleDataframe(dataset_fidelity.drop(columns=drop_col_list, inplace=False))
         normalized_datasets.append(dataset_fidelity_norm)
 
     return normalized_datasets, scaler
@@ -241,7 +244,7 @@ def test_models(models_to_test, test_mf, scaler, OUTPUT_LABELS, MODEL_PATH):
     test_multiple_models(models_to_test, test_mf, scaler, OUTPUT_LABELS, path=f"{MODEL_PATH}/error_results.csv", save_test_results=True)
 
 # Function to save the model settings and trained models
-def save_model_data(model_settings, dataset_settings, training_settings, MODEL_PATH, bnn_lf_model, bnn_mf_model, bnn_df_model, ck_df_model):
+def save_model_data(model_settings, dataset_settings, training_settings, MODEL_PATH, bnn_lf_model=None, bnn_mf_model=None, bnn_df_model=None, ck_df_model=None):
     """
     Saves the model and training settings, along with the trained models, to a YAML file.
 
@@ -348,7 +351,7 @@ def main():
     OUTPUT_LABELS = dataset_settings["OUTPUT_LABELS"]
     
     path_exists = setup_model_directory(MODEL_PATH)
-    normalized_datasets, scaler = load_and_normalize_datasets(dataset_settings, FIDELITY_COLUMN_NAME, path_exists, MODEL_PATH)
+    normalized_datasets, scaler = load_and_normalize_datasets(dataset_settings, path_exists, MODEL_PATH)
     
     dataset_lf = BNNDataset(normalized_datasets[0], INPUT_LABELS, OUTPUT_LABELS, device=model_settings["DEVICE"])
     dataset_mf = BNNDataset(normalized_datasets[1], INPUT_LABELS, OUTPUT_LABELS, device=model_settings["DEVICE"])
@@ -357,8 +360,11 @@ def main():
     train_mf, valid_mf, test_mf = dataset_mf.train_val_test_split(train_size=dataset_settings["MF_TRAIN_SIZE"],
                                                                   val_size=dataset_settings["MF_VALID_SIZE"],
                                                                   seed=model_settings["SEED"])
-
+    
     print("Size LF Dataset:", len(dataset_lf), "|", "Size MF Dataset:", len(dataset_mf))
+    
+    print("Train MF size:", len(train_mf), ",", "Valid MF size:", len(valid_mf), ",",  "Train LF size:", len(train_lf), ",", "Valid LF size:", len(valid_lf))
+    print("Test set size:", len(test_mf))
 
     bnn_lf_model = train_low_fidelity_model(INPUT_LABELS, OUTPUT_LABELS, model_settings, training_settings, MODEL_PATH, train_lf, valid_lf)
     bnn_mf_model = train_mid_fidelity_model(INPUT_LABELS, OUTPUT_LABELS, model_settings, training_settings, MODEL_PATH, train_mf, valid_mf)
