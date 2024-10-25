@@ -18,14 +18,32 @@ The project is organized as follows:
 
 ```
 AIModels/
+  └── EXAMPLE/
+        └── NormalizationData/
+              └── normdata.pkl
+        BNN_HF.pt
+        BNN_LF.pt
+        BNN_MF.pt
+        BNN_TL_HF.pt
+        BNN_TL_MF.pt
+        CoKriging.pkl_gp_model.pkl
+        CoKriging.pkl_metadata.pkl
+        error_results.csv
+        history_BNN_HF.pdf
+        history_BNN_LF.pdf
+        history_BNN_MF.pdf
+        history_BNN_TL_HF.pdf
+        history_BNN_TL_MF.pdf
 Datasets/
+  └── csv/
+  dataset_config_example.yaml
 Settings/
   └── model_settings.yaml
   └── server_settings.yaml
   └── training_settings.yaml
 bnn.py
 cokriging.py
-dataset_augmentation.ipynb
+example.ipynb
 scalers.py
 server.py
 test.py
@@ -55,24 +73,20 @@ This module defines the Co-Kriging (CK) model, which is used to combine predicti
 
 - **`CK`**: The Co-Kriging class that integrates predictions from a low-fidelity BNN model with a Gaussian Process (GP) to improve the prediction accuracy for higher-fidelity data. This class includes methods for training the GP model, making predictions, and saving/loading the CK model.
 
-### 4. `dataset_augmentation.ipynb`
-
-This Jupyter Notebook is intended for augmenting datasets, possibly generating additional synthetic data points or performing preprocessing tasks before training the BNN models. The specifics of what this notebook accomplishes depend on its content, which might include data cleaning, feature engineering, or data transformation.
-
-### 5. `scalers.py`
+### 4. `scalers.py`
 
 This module defines custom scalers used for normalizing data.
 
 - **`MinMaxScaler`**: A custom implementation of the Min-Max scaler that scales the features to a specified range. This scaler is particularly useful in neural network training as it ensures that the input features are within a range that facilitates convergence.
 
-### 6. `server.py`
+### 5. `server.py`
 
 This module provides the functionality to deploy a trained BNN model on a server. It allows the model to be used as a service, accepting input data over a network and returning predictions.
 
 - **`run_server`**: A function that sets up and runs the server using the settings defined in `server_settings.yaml`.
 - **`handle_request`**: A function to handle incoming requests to the server, process the input data, run the model, and return predictions.
 
-### 7. `test.py`
+### 6. `test.py`
 
 This script is responsible for testing the trained BNN and CK models on a test dataset. It performs the following tasks:
 
@@ -81,7 +95,7 @@ This script is responsible for testing the trained BNN and CK models on a test d
 - **Model Testing**: Runs the models on the test dataset, compares predictions against ground truth, and calculates error metrics.
 - **Result Saving**: Saves the results of the model testing to a CSV file.
 
-### 8. `training.py`
+### 7. `training.py`
 
 This script handles the end-to-end training process of the BNN models, including:
 
@@ -91,7 +105,7 @@ This script handles the end-to-end training process of the BNN models, including
 - **Model Saving**: Saves the trained models and their configurations for later use.
 - **Result Plotting**: Plots the predictions of the trained models and compares them with the validation data.
 
-### 9. `utils.py`
+### 8. `utils.py`
 
 This utility module provides helper functions that are used across various parts of the project.
 
@@ -105,16 +119,7 @@ This utility module provides helper functions that are used across various parts
 Before running the training or testing scripts, ensure that the YAML files in the `Settings/` directory are correctly configured. These files should define all necessary hyperparameters, file paths, and other configurations needed by the models and scripts.
 
 ### Step 2: Train the Models
-Run the `training.py` script to start the training process. This script will:
-- Load the dataset.
-- Normalize the data.
-- Train the low-fidelity, mid-fidelity, and transfer learning models.
-- Train the Co-Kriging model using the low-fidelity model as a basis.
-- Save all trained models and their configurations.
-
-```bash
-python training.py
-```
+Follow the example on `example.ipynb` script to create your personal Data Fusion training process. 
 
 ### Step 3: Test the Models
 After training, use the `test.py` script to evaluate the models on a test dataset. This script will:
@@ -133,8 +138,5 @@ Once the model is trained and validated, it can be deployed using the `server.py
 ```bash
 python server.py
 ```
-
-### Step 5: Visualize Results
-After running predictions, use the plotting utilities in `training.py` or custom scripts to visualize the results, compare them with ground truth data, and analyze the uncertainty estimates provided by the BNN models.
 
 ---

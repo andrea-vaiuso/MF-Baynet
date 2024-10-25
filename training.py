@@ -62,14 +62,13 @@ def load_and_normalize_datasets(dataset_settings, path_exists, model_path):
         MODEL_PATH (str): The path where normalization data should be saved/loaded.
 
     Returns:
-        tuple: A tuple containing a list of normalized datasets and the scaler used.
+        tuple: A tuple containing a list of normalized datasets and the scaler used (the order is defined by the list parameter 'FIDELITIES' of dataset_settings.yaml).
     """
     dataset = pd.read_csv(dataset_settings["DATASET_LOCATION"], sep=dataset_settings["SEP"])
     in_out_col = dataset_settings["OUTPUT_LABELS"] + dataset_settings["INPUT_LABELS"]
     all_dataset_columns = dataset.columns.tolist()
     drop_col_list = [col for col in all_dataset_columns if col not in in_out_col]
     if not path_exists:
-        
         scaler = MMS(dataset.drop(columns=drop_col_list, inplace=False), interval=(1, 2))
         scaler.save(path=f"{model_path}NormalizationData", filename=f"normdata.pkl")
     else:
@@ -81,127 +80,85 @@ def load_and_normalize_datasets(dataset_settings, path_exists, model_path):
         dataset_fidelity = dataset[dataset[dataset_settings["FIDELITY_COLUMN_NAME"]] == fid]
         dataset_fidelity_norm = scaler.scaleDataframe(dataset_fidelity.drop(columns=drop_col_list, inplace=False))
         normalized_datasets.append(dataset_fidelity_norm)
-
     return normalized_datasets, scaler
 
-# Function to train the low-fidelity model
-def train_low_fidelity_model(INPUT_LABELS, OUTPUT_LABELS, model_settings, training_settings, MODEL_PATH, train_lf, valid_lf):
+# Function to train the single-fidelity models
+def train_single_fidelity_model(fidelity, INPUT_LABELS, OUTPUT_LABELS, model_settings, training_settings, MODEL_PATH, train_data, valid_data, verbose=True, showPlotHistory=True, show_loadbar=True):
     """
-    Trains the low-fidelity Bayesian Neural Network (BNN) model.
+    Trains the Bayesian Neural Network (BNN) model.
 
     Args:
+        fidelity (str): The fidelity level to train the model (e.g. 'HF', 'LF' or 'MF')
         INPUT_LABELS (list): List of input feature names.
         OUTPUT_LABELS (list): List of output feature names.
         model_settings (dict): Settings for the BNN model.
         training_settings (dict): Training hyperparameters.
         MODEL_PATH (str): Path to save the trained model.
-        train_lf (BNNDataset): Training dataset for low-fidelity model.
-        valid_lf (BNNDataset): Validation dataset for low-fidelity model.
+        train_data (BNNDataset): Training dataset.
+        valid_data (BNNDataset): Validation dataset.
 
     Returns:
-        BNN: Trained low-fidelity model.
+        BNN: Trained model.
     """
-    bnn_lf_model = BNN(
+    bnn_model = BNN(
         in_dim=len(INPUT_LABELS),
         out_dim=len(OUTPUT_LABELS),
-        mu=model_settings["MU"],
-        std=model_settings["STD"],
-        units=model_settings["UNITS"],
+        mu=model_settings[f"MU_{fidelity}"],
+        std=model_settings[f"STD_{fidelity}"],
+        units=model_settings[f"UNITS_{fidelity}"],
         denseOut=False,
         dropout=False,
-        device=model_settings["DEVICE"],
+        device=model_settings[f"DEVICE"],
         activation=nn.LeakyReLU(),
-        model_name=model_settings["MODEL_NAME_LF"]
+        model_name=model_settings[f"MODEL_NAME_{fidelity}"]
     )
-    if training_settings["TRAIN_LF"]:
-        bnn_lf_model.train(
-            train_lf,
-            valid_lf,
-            patience=training_settings["PATIENCE_LF"],
-            n_epochs=training_settings["N_EPOCHS_LF"],
-            batch_size=training_settings["BATCH_SIZE_LF"],
-            lr=training_settings["LR_LF"],
+    if training_settings[f"TRAIN_{fidelity}"]:
+        bnn_model.train(
+            train_data,
+            valid_data,
+            patience=training_settings[f"PATIENCE_{fidelity}"],
+            n_epochs=training_settings[f"N_EPOCHS_{fidelity}"],
+            batch_size=training_settings[f"BATCH_SIZE_{fidelity}"],
+            lr=training_settings[f"LR_{fidelity}"],
             history_plot_saving_path=MODEL_PATH,
-            showPlotHistory=False
+            verbose=verbose, showPlotHistory=showPlotHistory, show_loadbar=show_loadbar
         )
-        bnn_lf_model.save(f"{MODEL_PATH}{bnn_lf_model.model_name}.pt", subfolder="")
-    return bnn_lf_model
-
-# Function to train the mid-fidelity model
-def train_mid_fidelity_model(INPUT_LABELS, OUTPUT_LABELS, model_settings, training_settings, MODEL_PATH, train_mf, valid_mf):
-    """
-    Trains the mid-fidelity Bayesian Neural Network (BNN) model.
-
-    Args:
-        INPUT_LABELS (list): List of input feature names.
-        OUTPUT_LABELS (list): List of output feature names.
-        model_settings (dict): Settings for the BNN model.
-        training_settings (dict): Training hyperparameters.
-        MODEL_PATH (str): Path to save the trained model.
-        train_mf (BNNDataset): Training dataset for mid-fidelity model.
-        valid_mf (BNNDataset): Validation dataset for mid-fidelity model.
-
-    Returns:
-        BNN: Trained mid-fidelity model.
-    """
-    bnn_mf_model = BNN(
-        in_dim=len(INPUT_LABELS),
-        out_dim=len(OUTPUT_LABELS),
-        mu=model_settings["MU_MF"],
-        std=model_settings["STD_MF"],
-        units=model_settings["UNITS_MF"],
-        denseOut=False,
-        dropout=False,
-        device=model_settings["DEVICE"],
-        activation=nn.LeakyReLU(),
-        model_name=model_settings["MODEL_NAME_MF"]
-    )
-    if training_settings["TRAIN_MF"]:
-        bnn_mf_model.train(
-            train_mf,
-            valid_mf,
-            patience=training_settings["PATIENCE_MF"],
-            n_epochs=training_settings["N_EPOCHS_MF"],
-            batch_size=training_settings["BATCH_SIZE_MF"],
-            lr=training_settings["LR_MF"],
-            history_plot_saving_path=MODEL_PATH,
-            showPlotHistory=False
-        )
-        bnn_mf_model.save(f"{MODEL_PATH}{bnn_mf_model.model_name}.pt", subfolder="")
-    return bnn_mf_model
+        bnn_model.save(f"{MODEL_PATH}{bnn_model.model_name}.pt", subfolder="")
+    return bnn_model
 
 # Function to perform transfer learning
-def transfer_learning(model_settings, training_settings, MODEL_PATH, train_mf, valid_mf, bnn_lf_model):
+def transfer_learning(fidelity, model_settings, training_settings, MODEL_PATH, train_hf, valid_hf, bnn_lf_model, verbose=True, showPlotHistory=True, show_loadbar=True):
     """
-    Performs transfer learning by fine-tuning the low-fidelity model on the mid-fidelity dataset.
+    Performs transfer learning by fine-tuning the lower-fidelity model on the higher-fidelity dataset.
 
     Args:
+        fidelity (str): The fidelity level to train the model (e.g. 'TL_HF', 'TL_MF')
         model_settings (dict): Settings for the BNN model.
         training_settings (dict): Training hyperparameters.
         MODEL_PATH (str): Path to save the fine-tuned model.
-        train_mf (BNNDataset): Training dataset for mid-fidelity model.
-        valid_mf (BNNDataset): Validation dataset for mid-fidelity model.
-        bnn_lf_model (BNN): Pre-trained low-fidelity model to be fine-tuned.
+        train_mf (BNNDataset): Training dataset for higher-fidelity model.
+        valid_mf (BNNDataset): Validation dataset for higher-fidelity model.
+        bnn_lf_model (BNN): Pre-trained lower-fidelity model to be fine-tuned.
 
     Returns:
         BNN: Fine-tuned model.
     """
     bnn_df_model = copy.deepcopy(bnn_lf_model) 
-    bnn_df_model.model_name = model_settings["MODEL_NAME"]
+    bnn_df_model.model_name = model_settings[f"MODEL_NAME_{fidelity}"]
     bnn_df_model.setModelGradients(False)
     all_layers = bnn_df_model.getAllLayersName()
-    bnn_df_model.setModelGradients(True, layers=all_layers[-training_settings["N_LAYER_TO_UNFREEZE"]:])
-    if training_settings["TRAIN_TL"]:
+    bnn_df_model.setModelGradients(True, layers=all_layers[-training_settings[f"N_LAYER_TO_UNFREEZE_{fidelity}"]:])
+    if training_settings[f"TRAIN_{fidelity}"]:
         bnn_df_model.train(
-            train_mf,
-            valid_mf,
-            n_epochs=training_settings["N_EPOCHS_TL"],
-            lr=training_settings["LR_TL"],
+            train_hf,
+            valid_hf,
+            n_epochs=training_settings[f"N_EPOCHS_{fidelity}"],
+            lr=training_settings[f"LR_{fidelity}"],
             restoreBestModel=True,
-            patience=training_settings["PATIENCE_TL"],
-            batch_size=training_settings["BATCH_SIZE_TL"],
+            patience=training_settings[f"PATIENCE_{fidelity}"],
+            batch_size=training_settings[f"BATCH_SIZE_{fidelity}"],
             history_plot_saving_path=MODEL_PATH,
-            showPlotHistory=False
+            verbose=verbose, showPlotHistory=showPlotHistory, show_loadbar=show_loadbar
         )
         bnn_df_model.save(f"{MODEL_PATH}{bnn_df_model.model_name}.pt", subfolder="")
     return bnn_df_model
@@ -239,9 +196,12 @@ def test_models(models_to_test, test_mf, scaler, OUTPUT_LABELS, MODEL_PATH):
         scaler (MMS): Scaler used for normalization.
         OUTPUT_LABELS (list): List of output feature names.
         MODEL_PATH (str): Path to save the test results.
+    
+    Returns:
+        pd.DataFrame: DataFrame containing the error metrics for each model.
     """
     print("Testing models...")
-    test_multiple_models(models_to_test, test_mf, scaler, OUTPUT_LABELS, path=f"{MODEL_PATH}/error_results.csv", save_test_results=True)
+    return test_multiple_models(models_to_test, test_mf, scaler, OUTPUT_LABELS, path=f"{MODEL_PATH}/error_results.csv", save_test_results=True)
 
 # Function to save the model settings and trained models
 def save_model_data(model_settings, dataset_settings, training_settings, MODEL_PATH, bnn_lf_model=None, bnn_mf_model=None, bnn_df_model=None, ck_df_model=None):
@@ -337,68 +297,3 @@ def plot_results(predict_data,
     plt.savefig(f"{MODEL_PATH}validation_plot.pdf")
     if showfig: 
         plt.show()
-
-# Main function to execute all steps
-def main():
-    """
-    Main function that orchestrates the training, testing, and saving of models, 
-    as well as the plotting of results.
-    """
-    model_settings, training_settings, dataset_settings = import_settings()
-    MODEL_PATH = training_settings["MODEL_PATH"]
-    FIDELITY_COLUMN_NAME = dataset_settings["FIDELITY_COLUMN_NAME"]
-    INPUT_LABELS = dataset_settings["INPUT_LABELS"]
-    OUTPUT_LABELS = dataset_settings["OUTPUT_LABELS"]
-    
-    path_exists = setup_model_directory(MODEL_PATH)
-    normalized_datasets, scaler = load_and_normalize_datasets(dataset_settings, path_exists, MODEL_PATH)
-    
-    dataset_lf = BNNDataset(normalized_datasets[0], INPUT_LABELS, OUTPUT_LABELS, device=model_settings["DEVICE"])
-    dataset_mf = BNNDataset(normalized_datasets[1], INPUT_LABELS, OUTPUT_LABELS, device=model_settings["DEVICE"])
-    
-    train_lf, valid_lf = dataset_lf.train_val_split(train_size=dataset_settings["LF_TRAIN_SIZE"], seed=model_settings["SEED"])
-    train_mf, valid_mf, test_mf = dataset_mf.train_val_test_split(train_size=dataset_settings["MF_TRAIN_SIZE"],
-                                                                  val_size=dataset_settings["MF_VALID_SIZE"],
-                                                                  seed=model_settings["SEED"])
-    
-    print("Size LF Dataset:", len(dataset_lf), "|", "Size MF Dataset:", len(dataset_mf))
-    
-    print("Train MF size:", len(train_mf), ",", "Valid MF size:", len(valid_mf), ",",  "Train LF size:", len(train_lf), ",", "Valid LF size:", len(valid_lf))
-    print("Test set size:", len(test_mf))
-
-    bnn_lf_model = train_low_fidelity_model(INPUT_LABELS, OUTPUT_LABELS, model_settings, training_settings, MODEL_PATH, train_lf, valid_lf)
-    bnn_mf_model = train_mid_fidelity_model(INPUT_LABELS, OUTPUT_LABELS, model_settings, training_settings, MODEL_PATH, train_mf, valid_mf)
-    bnn_df_model = transfer_learning(model_settings, training_settings, MODEL_PATH, train_mf, valid_mf, bnn_lf_model)
-    ck_df_model = train_co_kriging_model(training_settings, MODEL_PATH, model_settings, train_mf, bnn_lf_model)
-
-    models_to_test = []
-    if training_settings["TRAIN_LF"]: models_to_test.append(bnn_lf_model)
-    if training_settings["TRAIN_MF"]: models_to_test.append(bnn_mf_model)
-    if training_settings["TRAIN_TL"]: models_to_test.append(bnn_df_model)
-    if training_settings["TRAIN_CK"]: models_to_test.append(ck_df_model)
-
-    test_models(models_to_test, test_mf, scaler, OUTPUT_LABELS, MODEL_PATH)
-    save_model_data(model_settings, dataset_settings, training_settings, MODEL_PATH, bnn_lf_model, bnn_mf_model, bnn_df_model, ck_df_model)
-
-    predict_data = pd.DataFrame({
-        'aoa': -5,
-        'aos': 0,
-        'u_inf': 10,
-        'PP': np.array(range(0, 4000, 100)),
-        'FR': 0,
-        'FL': 0,
-        'RR': 0,
-        'RL': 0
-    })
-
-    out_prefix = "T"
-    plot_sample_dataset = pd.read_csv("S:\pools\\t\T-ZAV-EASA-MODEL-SI\\04_T-2 Case study\\06_Surrogate\\00_Datasets\\20240502_Validation3.csv", sep=dataset_settings["SEP"])
-
-    print("Saving plots...")
-    plot_results(predict_data, plot_sample_dataset, INPUT_LABELS, OUTPUT_LABELS, "PP", f"{out_prefix}_PP", show_test_set=True, out_prefix=out_prefix, showfig=False, 
-                 MODEL_PATH=MODEL_PATH, bnn_lf_model=bnn_lf_model, bnn_mf_model=bnn_mf_model, bnn_df_model=bnn_df_model, ck_df_model=ck_df_model, scaler=scaler)
-
-    print("End!")
-
-if __name__ == "__main__":
-    main()

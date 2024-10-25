@@ -1,13 +1,15 @@
-DATASET_LOCATION: "/dataset_file.csv"
+DATASET_LOCATION: "Datasets/csv/bscw_dataset.csv"
 SEP: ";"
 
-DATASET_DESCRIPTION: "Starting dataset with no augmentation"
+DATASET_DESCRIPTION: "Example dataset on BSCW"
 
-INPUT_LABELS: ["aoa", "aos", "u_inf", "PP", "FR", "FL", "RR", "RL"]
-OUTPUT_LABELS: ["T_PP", "Q_PP", "T_FR", "Q_FR", "T_FL", "Q_FL", "T_RR", "Q_RR", "T_RL", "Q_RL"]
-FIDELITY_COLUMN_NAME: "Fidelity"
-FIDELITIES: ["LF","MF"]
+INPUT_LABELS: ["mach","aoa"]
+OUTPUT_LABELS: ["cl","cm"]
+FIDELITY_COLUMN_NAME: "fidelity"
+FIDELITIES: ["low","mid","cfd"]
 
 LF_TRAIN_SIZE: 0.70
 MF_TRAIN_SIZE: 0.70
 MF_VALID_SIZE: 0.15
+HF_TRAIN_SIZE: 0.20
+HF_VALID_SIZE: 0.20

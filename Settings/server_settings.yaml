@@ -1,7 +1,7 @@
 # Path to the saved model file that will be used by the server
-MODEL_PATH: "AIModels/bnn_model_1/BNN_TL_1.pt"
+MODEL_PATH: "AIModels/EXAMPLE/BNN_TL_HF.pt"
 # Path to the normalization data file used during model training
-NORM_DATA_PATH: "AIModels/bnn_model_1/NormalizationData/normdata.pkl"
+NORM_DATA_PATH: "AIModels/EXAMPLE/NormalizationData/normdata.pkl"
 # Device on which the model will run (e.g., "cpu", "cuda" for GPU)
 DEVICE: "cpu"
 # Port number on which the server will listen for incoming connections

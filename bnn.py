@@ -1,5 +1,5 @@
 # AUTHOR: Andrea Vaiuso
-MODEL_VERSION = "4.15"
+MODEL_VERSION = "4.16"
 
 import torch
 import torch.nn as nn
@@ -18,6 +18,7 @@ from torch.utils.data import Dataset
 import pandas as pd
 import os
 from typing import List, Tuple
+import random
 
 Color = PrCol()
 
@@ -152,6 +153,34 @@ class BNNDataset(Dataset):
         val_dataset = BNNDataset(val_data, self.input_labels, self.output_labels)
 
         return train_dataset, val_dataset
+    
+    def remove_random(self, num_to_remove: int, seed: int = None):
+        """
+        Removes a specified number of random elements from the dataset.
+
+        Args:
+            num_to_remove (int): The number of elements to remove from the dataset.
+            seed (int, optional): Random seed for reproducibility. Defaults to None.
+
+        Returns:
+            BNNDataset: A new BNNDataset instance with the specified number of elements removed, or an empty BNNDataset if num_to_remove is greater than or equal to the dataset size.
+        """
+        if seed is not None:
+            random.seed(seed)
+        
+        if num_to_remove == 0:
+            # Return a copy of the current dataset
+            return BNNDataset(self.data.copy(), self.input_labels, self.output_labels, self.device, self.dtype)
+        
+        if num_to_remove >= len(self.data):
+            # Return an empty dataset
+            empty_data = pd.DataFrame(columns=self.data.columns)
+            return BNNDataset(empty_data, self.input_labels, self.output_labels, self.device, self.dtype)
+        
+        indices_to_remove = random.sample(range(len(self.data)), num_to_remove)
+        remaining_data = self.data.drop(self.data.index[indices_to_remove]).reset_index(drop=True)
+        
+        return BNNDataset(remaining_data, self.input_labels, self.output_labels, self.device, self.dtype)
 
 class BNN(nn.Module):
     """
@@ -667,7 +696,7 @@ class BNN(nn.Module):
             device (str): The device to load the model onto (default: "cpu").
         """
         self.load_state_dict(torch.load(path))
-        print(f"{Color.green}[{Color.end}{self.model_name}{Color.green}] >> Model Loaded on {Color.blue}{device}{Color.end}")
+        print(f"{Color.green}[{Color.end}{self.model_name}{Color.green}] >> Model Loaded on {Color.blue}{device}{Color.end} ({path})")
 
 
 def test_multiple_models(models_to_test: List[BNN], test_set: BNNDataset, scaler: MMS, output_labels: list, attempt: int = 100, path: str = "test_results.csv", save_test_results: bool = True) -> pd.DataFrame:
@@ -693,6 +722,7 @@ def test_multiple_models(models_to_test: List[BNN], test_set: BNNDataset, scaler
         #error_data[out_val + " Max/Min Err %"] = []
         #error_data[out_val + " Max/Min CoV %"] = []
     error_data["ERR_TOT%"] = []
+    error_data["STD_TOT%"] = []
     for i, model in enumerate(models_to_test):
         error_data["Model Name"].append(model.model_name)
         errors, cov = model.testModel(test_set=test_set,
@@ -700,17 +730,20 @@ def test_multiple_models(models_to_test: List[BNN], test_set: BNNDataset, scaler
                                 output_labels=output_labels,
                                 attempt=attempt)
         total_error = []
+        total_std =  []
         for out_val in range(len(output_labels)):
             error_on_output_i = np.array([t[out_val] for t in errors])
             cov_on_output_i = np.array([t[out_val] for t in cov])
             cov_on_output_i = (cov_on_output_i / scaler.offset[output_labels[out_val]]) * 100
             error = np.mean(error_on_output_i) / scaler.offset[output_labels[out_val]] * 100
             total_error.append(error)
+            total_std.append(cov_on_output_i)
             error_data[output_labels[out_val] + " ERR%"].append(f"{error:.2f}")
             error_data[output_labels[out_val] + " STD%"].append(f"{np.mean(cov_on_output_i):.2f}")
             #error_data[output_labels[out_val] + " Max/Min Err %"].append(f"{np.max(error_on_output_i):.2f} / {np.min(error_on_output_i):.2f}")
             #error_data[output_labels[out_val] + " Max/Min CoV %"].append(f"{np.max(cov_on_output_i):.2f} / {np.min(cov_on_output_i):.2f}")
         error_data["ERR_TOT%"].append(np.sqrt(np.mean(np.array(total_error)**2)))
+        error_data["STD_TOT%"].append(np.sqrt(np.mean(np.array(total_std)**2)))
         
     error_table = pd.DataFrame(error_data)
     if save_test_results: error_table.to_csv(path, index=False)
