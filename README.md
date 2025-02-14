@@ -1,3 +1,5 @@
+![Thanks](./logos.png)
+
 # Multi-Fidelity Bayesian Neural Network (MF-Baynet)
 
 ## Overview
