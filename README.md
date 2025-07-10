@@ -10,7 +10,7 @@ The Multi-Fidelity BNN library is designed to support the training, testing, and
 
 This library is based on our methodologies and approaches discussed in the paper:
 
-- **Vaiuso, Andrea et al.** "Multi-Fidelity Bayesian Neural Networks for Uncertainty Quantification in Transonic Aerodynamic Loads." arXiv preprint arXiv:2407.05684 (2024). [Link to Paper](https://arxiv.org/abs/2407.05684)
+- **Vaiuso, Andrea et al.** "Multi-fidelity transonic aerodynamic loads estimation using Bayesian neural networks with transfer learning." _Aerospace Science and Technology (2025): 110301_. [Link to Paper](https://www.sciencedirect.com/science/article/pii/S1270963825003724)
 
 Our paper provides the theoretical foundation for the multi-fidelity modeling techniques implemented in this library. It emphasizes the use of Bayesian Neural Networks (BNNs) with Transfer Learning (TL) to fuse data from different fidelities, a method that has been shown to outperform traditional approaches like Co-Kriging in both accuracy and uncertainty quantification. The approach is particularly valuable in aerospace engineering for tasks such as predicting transonic aerodynamic loads where different fidelity levels (e.g., low-fidelity panel methods, mid-fidelity RANS simulations, and high-fidelity CFD) are available.
 
